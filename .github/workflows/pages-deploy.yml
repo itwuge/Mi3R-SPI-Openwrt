@@ -2,7 +2,7 @@ on:
   # push:
   #   branches:
   #     - 'main'       # 监听 main 分支的推送
-  #     - 'master'     # 如果旧项目用 master，也可加上
+  #     - 'master'     # 如果旧项目用 master，也可加
       
   workflow_dispatch:
 

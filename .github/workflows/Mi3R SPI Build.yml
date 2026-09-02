@@ -1,5 +1,5 @@
 name: immortalwrt Mi3R-SPI Build
-# immortalwrt 自动编译 GitHub Actions 工作流
+# immortalwrt 自动编译 GitHub Actions 工作流 
 on:
   # 每月 UTC 02:00 执行（对应北京时间上午10点）
   schedule:

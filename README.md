@@ -1,6 +1,6 @@
 # OpenWrt 自动编译模板
 
-> 专为 **Xiaomi Mi Router R3 硬改 SPI 版** 打造的 GitHub‑Actions 自动固件构建模板
+> 专为 **Xiaomi MiR3 硬改 SPI 版** 打造的 GitHub‑Actions 自动固件构建模板
 >
 > ### 📖 在线文档站
 >
