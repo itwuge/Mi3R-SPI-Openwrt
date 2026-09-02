@@ -4,7 +4,7 @@
 >
 > ### 📖 在线文档站
 >
-> 👉 **[📚 点击访问项目静态文档站](https://itwuge.github.io/Openwrt-Mi3R-SPI/)**
+> 👉 **[📚 点击访问项目静态文档站](https://itwuge.github.io/Mi3R-SPI-Openwrt/)**
 
 ## 📋 概要
 

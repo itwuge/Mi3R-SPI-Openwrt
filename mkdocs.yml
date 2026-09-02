@@ -2,3 +2,21 @@ site_name: Mi3R-SPI OpenWrt
 docs_dir: docs
 theme:
   name: material
+  language: zh
+  features:
+    - navigation.tabs
+    - navigation.top
+    - search.suggest
+    - search.highlight
+
+nav:
+  - 首页: index.md
+  - 硬件说明: hardware.md
+  - 烧录教程: flash.md
+  - 常见问题: faq.md
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - toc:
+      permalink: true
