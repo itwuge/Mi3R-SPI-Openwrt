@@ -1,0 +1,131 @@
+// There are a lot of repetitive configuration files for CI and Rustup, we
+// deduplicrate this using RCL version 0.5.0. <https://github.com/ruuda/rcl>
+// Rebuild the files by running `rcl build`.
+
+// The minimum supported Rust version (MSRV).
+let msrv = "1.60.0";
+
+// All of the Rust versions that we want to test on CI.
+// We pick the MSRV, beta and nightly, and one version somewhat in between.
+let rust_versions = [msrv, "1.70.0", "beta", "nightly"];
+
+let banner = "# This file is generated from build.rcl.";
+
+let appveyor_config = {
+  environment = {
+    matrix = [
+      for rust_version in rust_versions:
+      for arch in ["x86_64", "i686"]:
+      { target = f"{rust_version}-{arch}-pc-windows-msvc" },
+      // We also test GNU in addition to MSVC. We do this only on beta to not
+      // have explosion, and versions after Rust 1.70something, because those
+      // use the sparse registry index format which is much faster.
+      { target = "beta-x86_64-pc-windows-gnu" },
+      { target = "beta-i686-pc-windows-gnu" },
+    ],
+  },
+
+  install = [
+    // Download the Rust and Cargo installer.
+    { ps = "Start-FileDownload \"https://static.rust-lang.org/dist/rust-${env:target}.msi\"" },
+
+    // Install Rust and Cargo and wait for installation to finish by using Write-Output.
+    { ps = "msiexec /package \"rust-${env:target}.msi\" /quiet /norestart | Write-Output" },
+
+    // Pick up the new Path variable after the installer modified it.
+    { ps = "$env:Path = [System.Environment]::GetEnvironmentVariable(\"Path\",\"Machine\")" },
+
+    // Print versions for future reference.
+    "rustc --version",
+    "cargo --version",
+  ],
+
+  build_script = ["cargo build"],
+  test_script = ["cargo test"],
+};
+
+// Steps for GitHub Actions job.
+let gha_steps = args => [
+  { uses = "actions/checkout@v4.2.1" },
+  {
+    name = "Install toolchain",
+    run =
+      f"""
+      rustup toolchain install {args.rust_version}
+      rustup target add {args.target} --toolchain {args.rust_version}
+      """,
+  },
+  {
+    name = "Build",
+    run = f"cargo +{args.rust_version} build --target {args.target} --verbose",
+  },
+  if args.do_test:
+  {
+    name = "Run tests",
+    run = f"cargo +{args.rust_version} test --target {args.target} --verbose",
+  },
+];
+
+let gha_jobs = [
+  for rust_version in rust_versions:
+  {
+    // Dots are not allowed in job names.
+    name = f"native-{rust_version.replace(".", "-")}",
+    rust_version = rust_version,
+    target = "x86_64-unknown-linux-gnu",
+    do_test = true,
+  },
+  {
+    name = "wasm-msrv",
+    rust_version = msrv,
+    target = "wasm32-unknown-unknown",
+    do_test = false,
+  },
+  {
+    name = "sgx-msrv",
+    rust_version = msrv,
+    target = "x86_64-fortanix-unknown-sgx",
+    do_test = false,
+  },
+];
+
+
+let github_actions_config = {
+  name = "Build",
+  on = {
+    push = { branches = ["*"] },
+    pull_request = { branches = ["master"] },
+  },
+  env = {
+    CARGO_TERM_COLOR = "always",
+  },
+  jobs = {
+    for job in gha_jobs:
+    job.name: {
+      runs-on = "ubuntu-latest",
+      steps = gha_steps(job),
+    },
+  },
+};
+
+{
+  ".appveyor.yml": {
+    banner = banner,
+    format = "json",
+    contents = appveyor_config,
+  },
+
+  ".github/workflows/build.yml": {
+    banner = banner,
+    format = "json",
+    contents = github_actions_config,
+  },
+
+  "rust-toolchain.toml": {
+    banner = banner,
+    format = "toml",
+    // For local development, we test with the MSRV by default, to not
+    // accidentally break things.
+    contents = { toolchain = { channel = msrv } },
+  },
+}

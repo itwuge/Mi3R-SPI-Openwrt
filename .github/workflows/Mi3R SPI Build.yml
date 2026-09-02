@@ -1,0 +1,231 @@
+name: immortalwrt Mi3R-SPI Build
+# immortalwrt 自动编译 GitHub Actions 工作流
+on:
+  # 每月 UTC 02:00 执行（对应北京时间上午10点）
+  schedule:
+    - cron: '0 2 1 * *'
+  # 推送 tag 触发编译
+  push:
+    tags:
+      - 'immortalwrt-v*'
+      - 'v*'
+  # 手动触发
+  workflow_dispatch:
+    inputs:
+      action:
+        description: '开始编译'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  TZ: Asia/Shanghai
+  # 这里修改，即可切换版本，例如：main、immortalwrt-23.05、24.10
+  IMMORTALWRT_BRANCH: "v25.12.0"
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      # Step 1: Checkout 代码
+      - name: 拉取仓库代码
+        uses: actions/checkout@v6
+
+      # Step 2: 设置 immortalwrt 构建环境
+      - name: 设置immortalwrt编译环境
+        run: |
+          sudo apt update -y
+          sudo apt full-upgrade -y
+          sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+            bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk gettext gcc-multilib \
+            g++-multilib git gnutls-dev gperf haveged help2man intltool lib32gcc-s1 libc6-dev-i386 libelf-dev \
+            libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses-dev libpython3-dev \
+            libreadline-dev libssl-dev libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano \
+            ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils \
+            python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs \
+            upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
+
+      # Step 3: 下载 immortalwrt 源码
+      - name: 下载 immortalwrt 源码
+        run: |
+          git clone -b ${{ env.IMMORTALWRT_BRANCH }} --single-branch --filter=blob:none https://github.com/immortalwrt/immortalwrt
+          sudo timedatectl set-timezone "$TZ"
+          # 替换02_network
+          mv ./immortalwrt/target/linux/ramips/mt7620/base-files/etc/board.d/02_network ./immortalwrt/target/linux/ramips/mt7620/base-files/etc/board.d/02_network.back
+          cp ./Mi3R-SPI/02_network ./immortalwrt/target/linux/ramips/mt7620/base-files/etc/board.d/
+          # 替换mt7620.mk
+          mv ./immortalwrt/target/linux/ramips/image/mt7620.mk ./immortalwrt/target/linux/ramips/image/mt7620.mk.back
+          cp ./Mi3R-SPI/mt7620.mk ./immortalwrt/target/linux/ramips/image/
+          # 复制dts设备树
+          cp ./Mi3R-SPI/mt7620a_xiaomi_miwifi-r3mi.dts ./immortalwrt/target/linux/ramips/dts/
+
+      # Step 4：尝试恢复 dl备份
+      - name: 下载恢复dl备份
+        uses: actions/download-artifact@v4
+        id: dl_restore
+        continue-on-error: true
+        with:
+          name: dl-backup
+          path: ./dl-tmp
+
+      # Step 5：解压 dl备份到源码目录
+      - name: 恢复dl目录
+        run: |
+          # 确保目标目录存在
+          mkdir -p ./immortalwrt/dl
+          if [ -d "./dl-tmp" ] && [ "$(ls -A ./dl-tmp 2>/dev/null)" ]; then
+            echo "发现历史dl备份 正在恢复..."
+            # 清空目标目录
+            rm -rf ./immortalwrt/dl/*
+            # 复制所有文件（包括隐藏文件）并保留属性
+            cp -a ./dl-tmp/. ./immortalwrt/dl/
+            echo "已恢复历史dl下载包"
+          else
+            echo "未找到有效的dl备份"
+            if [ -d "./Mi3R-SPI/dl" ]; then
+              echo "使用仓库内置dl目录..."
+              cp -a ./Mi3R-SPI/dl/. ./immortalwrt/dl/
+            else
+              echo "内置dl目录也不存在 将完全依赖在线下载"
+            fi
+          fi
+          
+          # 可选:显示dl目录大小 便于调试
+          du -sh ./immortalwrt/dl
+
+      # Step 6：feeds 更新安装
+      - name: feeds 更新安装
+        run: |
+          cd immortalwrt
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      # Step 7: 配置编译选项
+      - name: 配置编译选项
+        run: |
+          cp ./Mi3R-SPI/.config ./immortalwrt/
+          cd immortalwrt
+          make download -j8
+
+      # Step 8: 组织 Release Tag、Name
+      - name: 组织 Tag
+        id: relvars
+        run: |
+          BUILD_TS=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S')
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "release_name=MiR3-SPI ${{ github.ref_name }} #${{ github.run_number }}" >> $GITHUB_OUTPUT
+            echo "release_tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "release_name=MiR3-SPI build-${{ github.sha }} #${{ github.run_number }}" >> $GITHUB_OUTPUT
+            echo "release_tag=mi3r-SPI-build-${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+          mkdir -p immortalwrt/files/etc
+          echo "BUILD_TIME=$BUILD_TS" > immortalwrt/files/etc/buildinfo
+          echo "GIT_SHA=$(git rev-parse --short HEAD)" >> immortalwrt/files/etc/buildinfo
+          # 3. 把时间输出为action变量 后续打包release也可以用
+          echo "build_time=$BUILD_TS" >> $GITHUB_OUTPUT         
+
+      # Step 9: 开始编译
+      - name: 开始编译 immortalwrt
+        run: |
+          cd immortalwrt
+          make -j$(nproc) V=s || make -j1 V=s 2>&1 | tee build.log
+
+
+
+      # Step 10: 确认固件存在
+      - name: 固件存在就打包
+        if: success()
+        run: |
+          cd immortalwrt 
+          tar -zcvf Mi3R-SPI-离线IPK插件包.tar.gz \
+          bin/packages/mipsel_24kc/luci \
+          bin/packages/mipsel_24kc/packages
+
+          ls -lh Mi3R-SPI-离线IPK插件包.tar.gz
+
+      # Step 11：编译成功备份dl目录为artifact
+      - name: 备份dl下载目录
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: dl-backup
+          path: immortalwrt/dl
+          retention-days: 45
+
+      # Step 12: 编译成功上传编译成果
+      - name: 上传编译成果
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: immortalwrt-firmware
+          path:  |
+            immortalwrt/bin/targets/ramips/mt7620/*.bin
+            immortalwrt/bin/targets/ramips/mt7620/*.img
+            immortalwrt/Mi3R-SPI-离线IPK插件包.tar.gz
+          retention-days: 30
+
+      # Step 13: 编译失败上传编译日志
+      - name: 编译失败上传失败日志
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: build-error-log
+          path: immortalwrt/build.log
+          retention-days: 30
+
+      # Step 14: 创建Release发布固件
+      - name: 创建Release发布固件
+        uses: softprops/action-gh-release@v3
+        if: success() && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+        with:
+          name: ${{ steps.relvars.outputs.release_name }}
+          tag_name: ${{ steps.relvars.outputs.release_tag }}
+          draft: false
+          prerelease: ${{ github.ref_type != 'tag' }}
+          overwrite: false
+          body: |
+            # ImmortalWrt 小米路由器3 硬改SPI固件
+            ---------------------------------------------
+            | 项目 | 参数 |
+            |------|------|
+            | 默认地址 | 192.168.1.1 |
+            | 用户名 | root |
+            | 默认密码 | 空，请登录后立即修改 |
+            | 内置插件 | TTYD终端、DDNS、ZeroTier |
+            | 编译时间 | ${{ steps.relvars.outputs.build_time }} |
+            | Git SHA | ${{ github.sha }} |
+            ---------------------------------------------
+            ## 📥下载固件
+            [👉点此跳转到本页资源区](#assets)
+            向下滚动到 Assets 下载对应固件 bin 文件
+            > LuCI+Packages离线ipk插件: Mi3R-SPI-离线IPK插件包.tar.gz
+            ---------------------------------------------
+            ## ⚠️刷写注意事项
+            1. 本固件仅适用于**小米路由器3 硬改SPI版本** 原版NAND机器请勿刷入 会变砖
+            2. 首次登录密码为空 登录后务必第一时间设置root密码
+            3.  Breed下刷写:选择 `sysupgrade-bin` **不要保留配置** 全新安装
+            4. 刷写完成等待2-5分钟启动 中途不要断电
+            5. 如无法访问192.168.1.1 请检查电脑IP网段 清理浏览器缓存
+            6. 如果需要其他插件的可以去看看 Mi3R-SPI-离线IPK插件包.tar.gz
+            7. 固件为个人编译 仅供学习测试 生产环境请谨慎使用
+            ---------------------------------------------
+            🙏 **致谢**
+
+
+            <img src="https://github.com/immortalwrt.png" width="35"/> [ImmortalWrt](https://github.com/immortalwrt/immortalwrt) 开源项目
+
+
+            <img src="https://github.com/yuos-bit.png" width="35"/> [yuos-bit](https://github.com/yuos-bit/AutoBuild-OpenWrt) 自动编译模板
+
+
+            感谢各位大佬的硬件硬改、固件开发方案
+          files: |
+            immortalwrt/bin/targets/ramips/mt7620/*.bin
+            immortalwrt/bin/targets/ramips/mt7620/*.img
+            immortalwrt/Mi3R-SPI-离线IPK插件包.tar.gz
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTIONS_TRIGGER_PAT }}

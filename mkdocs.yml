@@ -1,0 +1,4 @@
+site_name: Mi3R-SPI OpenWrt
+docs_dir: docs
+theme:
+  name: material

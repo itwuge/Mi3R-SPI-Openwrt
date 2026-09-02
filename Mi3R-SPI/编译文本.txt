@@ -1,0 +1,41 @@
+sudo bash -c 'bash <(curl -s https://build-scripts.immortalwrt.org/init_build_environment.sh)'
+
+git clone -b v25.12.0 --single-branch --filter=blob:none https://github.com/immortalwrt/immortalwrt
+
+# 修改设备树
+mv /home/wuge/immortalwrt/target/linux/ramips/mt7620/base-files/etc/board.d/02_network /home/wuge/immortalwrt/target/linux/ramips/mt7620/base-files/etc/board.d/02_network.back && cp /home/wuge/openwrt/02_network  /home/wuge/immortalwrt/target/linux/ramips/mt7620/base-files/etc/board.d/
+
+mv /home/wuge/immortalwrt/target/linux/ramips/image/mt7620.mk /home/wuge/immortalwrt/target/linux/ramips/image/mt7620.mk.back && cp /home/wuge/openwrt/mt7620.mk  /home/wuge/immortalwrt/target/linux/ramips/image/
+
+cp /home/wuge/openwrt/mt7620a_xiaomi_miwifi-r3mi.dts  /home/wuge/immortalwrt/target/linux/ramips/dts/
+
+
+cd immortalwrt
+
+# 更新依赖
+./scripts/feeds update -a
+./scripts/feeds install -a
+
+
+# 修改rust Makefile
+
+mv /home/wuge/immortalwrt/feeds/packages/lang/rust/Makefile /home/wuge/immortalwrt/feeds/packages/lang/rust/Makefile.back && cp /home/wuge/openwrt/Makefile  /home/wuge/immortalwrt/feeds/packages/lang/rust/
+
+
+
+# 选择固件
+make menuconfig
+
+# 预下载所有源码包
+make download -j$(nproc)
+
+# 编译
+make -j8 V=s
+
+# 清除旧的编译产物
+make clean
+# 清除旧的编译产物、交叉编译工具及工具链等目录
+make dirclean
+# 清除 Open­Wrt 源码以外的文件
+make distclean
+
