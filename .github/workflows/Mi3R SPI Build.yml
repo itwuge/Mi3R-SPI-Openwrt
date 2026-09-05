@@ -179,13 +179,18 @@ jobs:
       # Step 14: 创建Release发布固件
       - name: 创建Release发布固件
         uses: softprops/action-gh-release@v3
-        if: success() && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+        if: |
+          success() && 
+          (
+            (github.event_name == 'push' && github.ref_type == 'tag') || 
+            github.event_name == 'workflow_dispatch'
+          )
         with:
           name: ${{ steps.relvars.outputs.release_name }}
           tag_name: ${{ steps.relvars.outputs.release_tag }}
           draft: false
-          prerelease: ${{ github.ref_type != 'tag' }}
-          overwrite: false
+          prerelease: ${{ github.event_name == 'workflow_dispatch' }}
+          overwrite: true
           body: |
             # ImmortalWrt 小米路由器3 硬改SPI固件
             ---------------------------------------------

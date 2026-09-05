@@ -6,7 +6,7 @@
 - 默认密码：空，登录后第一时间修改密码
 
 ## 📦固件下载
-👉 [前往 GitHub Releases 获取最新编译固件](https://github.com/itwuge/Openwrt-Mi3R-SPI/releases)
+👉 [前往 GitHub Releases 获取最新编译固件](https://github.com/itwuge/Mi3R-SPI-Openwrt/releases)
 
 ## 📖文档导航
 - [硬件硬改说明](hardware.md)
