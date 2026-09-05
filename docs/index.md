@@ -9,7 +9,7 @@
 👉 [前往 GitHub Releases 获取最新编译固件](https://github.com/itwuge/Mi3R-SPI-Openwrt/releases)
 
 ## 📖文档导航
-- [硬件硬改说明](hardware.md)
+- [硬件硬改说明](hardware.md) 
 - [Breed刷机教程](flash.md)
 - [常见问题FAQ](faq.md)
 

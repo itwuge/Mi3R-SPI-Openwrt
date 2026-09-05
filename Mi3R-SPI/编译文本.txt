@@ -12,7 +12,7 @@ cp /home/wuge/openwrt/mt7620a_xiaomi_miwifi-r3mi.dts  /home/wuge/immortalwrt/tar
 
 cd immortalwrt
 
-# 更新需要的依赖
+# 更新需要的依赖 
 ./scripts/feeds update -a
 ./scripts/feeds install -a
 

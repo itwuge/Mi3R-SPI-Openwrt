@@ -215,9 +215,9 @@ jobs:
             4. 刷写完成等待2-5分钟启动 中途不要断电
             5. 如无法访问192.168.1.1 请检查电脑IP网段 清理浏览器缓存
             6. 如果需要其他插件的可以去看看 Mi3R-SPI-离线IPK插件包.tar.gz
-            7. 固件为个人编译 仅供学习测试 生产环境请谨慎使用
+            7. 固件为个人编译 仅供学习测试 生产环境请谨慎使用 
             ---------------------------------------------
-            🙏 **致谢**
+            🙏 **致谢** 
 
 
             <img src="https://github.com/immortalwrt.png" width="35"/> [ImmortalWrt](https://github.com/immortalwrt/immortalwrt) 开源项目

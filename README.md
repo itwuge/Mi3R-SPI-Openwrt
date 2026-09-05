@@ -6,7 +6,7 @@
 >
 > 👉 **[📚 点击访问项目静态文档站](https://itwuge.github.io/Mi3R-SPI-Openwrt/)**
 
-## 📋 概要
+## 📋 概要 
 
 本仓库基于 GitHub‑Actions 实现 ImmortalWrt / OpenWrt 固件全自动编译。
 
